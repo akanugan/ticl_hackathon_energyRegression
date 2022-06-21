@@ -5,7 +5,7 @@ from torch_geometric.nn.conv import DynamicEdgeConv
 from torch_geometric.nn.pool import avg_pool_x
 from torch.nn import Sequential, Linear
 import os.path as osp
-from torch_geometric.data import Dataset, download_url, DataLoader
+from torch_geometric.data import Dataset, download_url, DataLoader, Data
 
 import pandas as pd
 import numpy as np
@@ -16,6 +16,8 @@ import awkward as ak
 
 import glob
 import os.path as osp
+
+import time
 
 class GraphNet(Dataset):
     r'''
@@ -81,7 +83,6 @@ class GraphNet(Dataset):
 
     def __init__(self, root, transform=None):
         super(GraphNet, self).__init__(root, transform)
-        
         self.strides = [0]
         # self.calculate_offsets()
         self.root = root
@@ -97,7 +98,7 @@ class GraphNet(Dataset):
 
     @property
     def raw_file_names(self):
-        raw_files = sorted(glob.glob(osp.join(self.raw_dir, '*ntuple')))
+        raw_files = glob.glob(osp.join(self.root, 'ntuples_7*'))
         return raw_files
 
     @property
@@ -106,20 +107,22 @@ class GraphNet(Dataset):
 
 
     def get(self, idx):
+        t_get = time.perf_counter();
         file_idx = int((idx % 5000)/5000)
         idx_in_file = idx % 5000
         #if file_idx >= self.strides.size:
         #    raise Exception(f'{idx} is beyond the end of the event list {self.strides[-1]}')
         edge_index = torch.empty((2,0), dtype=torch.long)
-        print(self.raw_files)
 
         with uproot.open(self.raw_paths[file_idx]) as f:
             tracksters = f["ntuplizer/tracksters"]
-            tmpdf = ak.to_pandas(tracksters.arrays(entry_start = idx_in_file, entry_stop = idx_in_file + 1))
+            t_pd = time.perf_counter()
+            tmpdf = ak.to_pandas(tracksters.arrays(entry_start = idx_in_file, entry_stop = idx_in_file + 1)) # Update me!!!! Takes half a second
+            t_pd_end = time.perf_counter()
+            tmpdf.index.names = ["Event", "Trackster", "Cluster"]
+            print(t_pd_end-t_pd, time.perf_counter()-t_get)
 
-
-            print(self.raw_paths[file_idx])
-            return tmpdf
+            return Data()
 
             '''
 
@@ -163,16 +166,17 @@ class GraphNet(Dataset):
 
 import os
 
-root = "/" # close_by_single_kaon/production/7264977/
-
-print(os.listdir(root))
+root = "/eos/cms/store/group/dpg_hgcal/comm_hgcal/hackathon/samples/close_by_single_kaon/production/7264977/"
 
 dataset = GraphNet(root)
 
 print(dataset.len())
 
 train_loader = DataLoader(dataset)
+counter = 0
+t = time.perf_counter()
 for data in train_loader:
-    print(data)
+    counter = counter +1
+
 
 
