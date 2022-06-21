@@ -122,6 +122,11 @@ class GraphNet(Dataset):
             tmpdf.index.names = ["Event", "Trackster", "Cluster"]
             print(t_pd_end-t_pd, time.perf_counter()-t_get)
 
+            # Create node and edge data
+
+            
+
+
             return Data()
 
             '''
