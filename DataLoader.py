@@ -96,6 +96,35 @@ class GraphNet(Dataset):
     def len(self):
         return 5000 * len(root) # is this uniform over all files?
 
+    
+    def calculate_edges(df):
+        cluster_indices = ['vertices_x', 'vertices_y', 'vertices_z', 'vertices_energy']
+        starts = []
+        stops = []
+        N_tracksters = df.NTracksters.median().astype(int)
+        for t in range(N_tracksters):
+            trackster = df.loc[t].reset_index()
+            trackster_starts = []
+            trackster_stops = []
+            df = df[cluster_indices]
+            z_values = df.loc[t]['vertices_z'].unique()
+            for i, z in enumerate(z_values):
+                layer = trackster.where(trackster.vertices_z == z_values[i]).dropna()['subsubentry'].values
+                pre_layer = trackster.where(trackster.vertices_z == z_values[i-1]).dropna()['subsubentry'].values
+                for l in layer:
+                    for k in layer:
+                        if l < k:
+                            trackster_starts.append(l)
+                            trackster_stops.append(k)
+                    for k in pre_layer:
+                        trackster_starts.append(l)
+                        trackster_stops.append(k)
+
+            starts.append(trackster_starts)
+            stops.append(trackster_stops)
+        return starts, stops
+
+
     @property
     def raw_file_names(self):
         raw_files = glob.glob(osp.join(self.root, 'ntuples_7*'))
