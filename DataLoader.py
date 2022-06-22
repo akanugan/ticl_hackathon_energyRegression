@@ -102,14 +102,11 @@ class TracksterLoader(Dataset):
 
 
     def get(self, idx):
-        cluster_indices = ['vertices_x', 'vertices_y', 'vertices_z', 'vertices_energy']
-        t_get = time.perf_counter();
         file_idx = int((idx % 5000)/5000)
         idx_in_file = idx % 5000
 
         with uproot.open(self.raw_paths[file_idx]) as f:
             tracksters = f["ntuplizer/tracksters"]
-            t_pd = time.perf_counter()
             event = ak.to_pandas(tracksters.arrays(entry_start = idx_in_file, entry_stop = idx_in_file + 1)) # Update me!!!! Takes half a second
             #TODO: This probably needs to be replaced by event.loc[some_index]
             event = event.loc[0] # Now only two indices are left
@@ -167,7 +164,7 @@ if __name__ == '__main__':
         print("Running on x360")
         root = "/home/philipp/Code/ticl_hackathon_energy_regression/testdata/"
         regex = 'testdata*'
-        N_events = 10
+        N_events = 1
     else:
         print("Please specify root path")
 
@@ -175,7 +172,6 @@ if __name__ == '__main__':
     print(dataset.len())
 
     train_loader = DataLoader(dataset)
-    counter = 0
     for i, data in enumerate(train_loader):
         if i > 11: break
         print(f"Event {i}")
@@ -183,3 +179,5 @@ if __name__ == '__main__':
         print()
         print(f"Data[0].x: {data[0].x}")
         print(f"Data[0].edge_index: {data[0].edge_index}")
+
+    pdb.set_trace()
