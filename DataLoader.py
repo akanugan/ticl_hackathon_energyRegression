@@ -37,6 +37,11 @@ class TracksterLoader(Dataset):
     # https://pytorch.org/tutorials/beginner/basics/data_tutorial.html
     def len(self):
         # return 5000 * len(self.root) # is this uniform over all files?
+        if self.N_events == 0:
+            for file in self.raw_file_names:
+                with uproot.open(file) as f:
+                    self.N_events+=f["ntuplizer/tracksters"].num_entries
+        # print(self.N_events)
         return self.N_events
 
     @property
@@ -87,17 +92,17 @@ class TracksterLoader(Dataset):
         """
         cluster_indices = ['vertices_x', 'vertices_y', 'vertices_z', 'vertices_energy']
         N_tracksters = df.NTracksters.median().astype(int)
-        event_edges = self.calculate_edges(df)
+        event_edges = torch.tensor(self.calculate_edges(df))
         X_ID = []
         # y = calo energy
-        vertices = torch.from_numpy(df[cluster_indices].values)
+        vertices = torch.tensor(df[cluster_indices].values, dtype=torch.float)
+        stsReg =  torch.tensor(df['sim_tracksters_CP_regE'][0].values[0], dtype=torch.float)
         for i in range(N_tracksters):
             # Loop over tracksters to get the number of layer clusters
             n_layer_clusters = len(df.loc[i])
             X_ID.append(i * np.ones(n_layer_clusters))
         X_ID = torch.from_numpy(np.concatenate(X_ID))
-        pdb.set_trace()
-        graph = torch_geometric.data.Data(x=vertices, edge_index=event_edges, x_id=X_ID)
+        graph = torch_geometric.data.Data(x=vertices, edge_index=event_edges, x_id=X_ID, y=stsReg)
         return graph
 
 
@@ -105,10 +110,13 @@ class TracksterLoader(Dataset):
         file_idx = int((idx % 5000)/5000)
         idx_in_file = idx % 5000
 
+        counter = 0
         with uproot.open(self.raw_paths[file_idx]) as f:
             tracksters = f["ntuplizer/tracksters"]
+            sim_tracksters_CP = f["ntuplizer/simtrackstersCP"]
+            sim_tracksters_CP_regE_df = ak.to_pandas(sim_tracksters_CP.arrays('stsCP_regressed_energy', entry_start = idx_in_file, entry_stop = idx_in_file + 1))
             event = ak.to_pandas(tracksters.arrays(entry_start = idx_in_file, entry_stop = idx_in_file + 1)) # Update me!!!! Takes half a second
-            #TODO: This probably needs to be replaced by event.loc[some_index]
+            event['sim_tracksters_CP_regE'] = sim_tracksters_CP_regE_df
             event = event.loc[0] # Now only two indices are left
             data = self.turn_df_to_graph(event)
             return data
@@ -164,7 +172,7 @@ if __name__ == '__main__':
         print("Running on x360")
         root = "/home/philipp/Code/ticl_hackathon_energy_regression/testdata/"
         regex = 'testdata*'
-        N_events = 1
+        N_events = 3
     else:
         print("Please specify root path")
 
@@ -179,5 +187,4 @@ if __name__ == '__main__':
         print()
         print(f"Data[0].x: {data[0].x}")
         print(f"Data[0].edge_index: {data[0].edge_index}")
-
-    pdb.set_trace()
+        print(f"Truth: ", data[0].y)
