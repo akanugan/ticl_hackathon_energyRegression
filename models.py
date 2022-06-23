@@ -22,13 +22,14 @@ import torch_geometric
 from DataLoader import TracksterLoader
 import csv
 
-BATCHSIZE = 32
+BATCHSIZE = 512
 EPOCH = 2
 
 if os.uname()[1] == 'patatrack02.cern.ch':
-    root = "/eos/cms/store/group/dpg_hgcal/comm_hgcal/hackathon/samples/close_by_single_kaon/production/7264977/"
+    root = "/data2/user/phzehetn/Hackathon/Data/"
+    save_dir = '/afs/cern.ch/work/p/phzehetn/public/TICL/Hackathon/'
     regex = "ntuples_7*"
-    N_events = 10000
+    N_events = 1024
 elif os.uname()[1] == 'x360':
     print("Running on x360")
     root = "/home/philipp/Code/ticl_hackathon_energy_regression/testdata/"
@@ -107,9 +108,12 @@ def train():
             epoch_loss.append(loss_value.item())
             optimizer.step()
         #print(f"Loss after {epoch+1} epochs", np.mean(epoch_loss))
-        spath = f"/eos/home-m/mmatthew/{epoch}"
-        os.mkdir(spath)
-        torch.save(model.state_dict(), spath)
+        sdir = save_dir + f'{epoch}/'
+        try:
+            os.mkdir(sdir)
+        except:
+            print(f"{sdir} already exists")
+        torch.save(model.state_dict(), sdir + 'model.pb')
         print("Epoch", epoch, "Loss", np.mean(epoch_loss), "Pred", energy.detach(), "GT", data.y)
         ls.append([epoch, np.mean(epoch_loss), energy.detach().cpu().numpy()[0], data.y.detach().cpu().numpy()[0]])
 
@@ -126,4 +130,4 @@ with open(filename, 'w', newline="") as file:
         csvwriter.writerow(row)
 
 
-torch.save(model.state_dict(),"/eos/home-m/mmatthew/")
+torch.save(model.state_dict(), save_dir+'model.pb')
