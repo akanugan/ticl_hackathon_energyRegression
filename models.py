@@ -2,6 +2,8 @@ import pdb
 import os
 import argparse
 
+os.environ["CUDA_VISIBLE_DEVICES"]="3"
+
 import sklearn
 import numpy as np
 from random import randrange
@@ -19,8 +21,10 @@ from torch_geometric.data import DataLoader
 import torch_geometric
 
 from DataLoader import TracksterLoader
+import csv
 
-BATCHSIZE = 8
+BATCHSIZE = 32
+EPOCH = 2
 
 if os.uname()[1] == 'patatrack02.cern.ch':
     root = "/eos/cms/store/group/dpg_hgcal/comm_hgcal/hackathon/samples/close_by_single_kaon/production/7264977/"
@@ -62,8 +66,11 @@ class TestNet(nn.Module):
         return energy
 
 
+CUDA_VISIBLE_DEVICES=2,4
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
+
 
 model = TestNet().to(device)
 
@@ -76,12 +83,15 @@ train_loader = DataLoader(TracksterLoader(root, regex=regex, N_events=N_events),
     batch_size=BATCHSIZE, shuffle=True)
 
 
+
+
+ls = []
 losses = []
 def train():
     print("Start Training")
     model.train()
     optimizer.zero_grad()
-    for epoch in range(5):
+    for epoch in range(EPOCH):
         epoch_loss = []
         for data in train_loader:
             data = data.to(device)
@@ -90,8 +100,24 @@ def train():
             loss_value.backward()
             epoch_loss.append(loss_value.item())
             optimizer.step()
-        print(f"Loss after {epoch+1} epochs", np.mean(epoch_loss))
+        #print(f"Loss after {epoch+1} epochs", np.mean(epoch_loss))
+        spath = f"/eos/home-m/mmatthew/{epoch}"
+        os.mkdir(spath)
+        torch.save(model.state_dict(), spath)
+	print("Epoch", epoch, "Loss", np.mean(epoch_loss), "Pred", energy.detach(), "GT", data.y)
+        ls.append([epoch, np.mean(epoch_loss), energy.detach().cpu().numpy()[0], data.y.detach().cpu().numpy()[0]])
 
 
 train()
 print("DONE")
+
+filename = 'b1_ev100_ep100.csv'
+header = ["Epoch", "Mean Loss", "Pred", "Truth"]
+with open(filename, 'w', newline="") as file:
+    csvwriter = csv.writer(file)
+    csvwriter.writerow(header)
+    for row in ls:
+        csvwriter.writerow(row)
+
+
+torch.save(model.state_dict(),"/eos/home-m/mmatthew/")
