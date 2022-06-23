@@ -110,7 +110,7 @@ def train():
         spath = f"/eos/home-m/mmatthew/{epoch}"
         os.mkdir(spath)
         torch.save(model.state_dict(), spath)
-	print("Epoch", epoch, "Loss", np.mean(epoch_loss), "Pred", energy.detach(), "GT", data.y)
+        print("Epoch", epoch, "Loss", np.mean(epoch_loss), "Pred", energy.detach(), "GT", data.y)
         ls.append([epoch, np.mean(epoch_loss), energy.detach().cpu().numpy()[0], data.y.detach().cpu().numpy()[0]])
 
 
