@@ -26,23 +26,34 @@ import time
 class TracksterLoader(Dataset):
 
 
-    def __init__(self, root, regex='*.root', N_events=1, transform=None):
+    def __init__(self, root, regex='*.root', N_events=0, transform=None):
         super(TracksterLoader, self).__init__(root, transform)
         self.strides = [0]
-        self.root = root
+        print("strides: ", self.strides[-1])
         self.regex = regex
         self.N_events = N_events
+        self.calc_offset()
+        self.root = root
+        
+        
 
     # Maybe should be called __len__
     # https://pytorch.org/tutorials/beginner/basics/data_tutorial.html
+
+    def calc_offset(self):
+        events = 0
+        for file in self.raw_file_names:
+            with uproot.open(file) as f:
+                events+=f["ntuplizer/tracksters"].num_entries
+                if (self.N_events !=0 and events < self.N_events):
+                    self.strides.append(events)
+                else:
+                    self.strides.append(self.N_events)
+                    break
+        print(self.strides)
+
     def len(self):
-        # return 5000 * len(self.root) # is this uniform over all files?
-        if self.N_events == 0:
-            for file in self.raw_file_names:
-                with uproot.open(file) as f:
-                    self.N_events+=f["ntuplizer/tracksters"].num_entries
-        # print(self.N_events)
-        return self.N_events
+        return self.strides[-1]
 
     @property
     def raw_file_names(self):
@@ -107,15 +118,17 @@ class TracksterLoader(Dataset):
 
 
     def get(self, idx):
-        file_idx = int((idx % 5000)/5000)
-        idx_in_file = idx % 5000
+        file_idx = np.searchsorted(self.strides, idx,side='right')-1
+        evt_idx = idx - self.strides[max(0,file_idx)]
+
+        print(file_idx, evt_idx)
 
         counter = 0
         with uproot.open(self.raw_paths[file_idx]) as f:
             tracksters = f["ntuplizer/tracksters"]
             sim_tracksters_CP = f["ntuplizer/simtrackstersCP"]
-            sim_tracksters_CP_regE_df = ak.to_pandas(sim_tracksters_CP.arrays('stsCP_regressed_energy', entry_start = idx_in_file, entry_stop = idx_in_file + 1))
-            event = ak.to_pandas(tracksters.arrays(entry_start = idx_in_file, entry_stop = idx_in_file + 1)) # Update me!!!! Takes half a second
+            sim_tracksters_CP_regE_df = ak.to_pandas(sim_tracksters_CP.arrays('stsCP_regressed_energy', entry_start = evt_idx, entry_stop = evt_idx + 1))
+            event = ak.to_pandas(tracksters.arrays(entry_start = evt_idx, entry_stop = evt_idx + 1)) # Update me!!!! Takes half a second
             event['sim_tracksters_CP_regE'] = sim_tracksters_CP_regE_df
             event = event.loc[0] # Now only two indices are left
             data = self.turn_df_to_graph(event)
@@ -181,10 +194,12 @@ if __name__ == '__main__':
 
     train_loader = DataLoader(dataset)
     for i, data in enumerate(train_loader):
-        if i > 11: break
+        #if i > 11: break
+        '''
         print(f"Event {i}")
         print(f"Data: {data}")
         print()
         print(f"Data[0].x: {data[0].x}")
         print(f"Data[0].edge_index: {data[0].edge_index}")
         print(f"Truth: ", data[0].y)
+        '''
