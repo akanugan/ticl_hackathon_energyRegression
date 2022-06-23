@@ -10,7 +10,6 @@ import subprocess
 import torch
 from torch import nn
 import torch.nn.functional as F
-from torch_geometric.nn.conv import DynamicEdgeConv
 from torch_geometric.nn.conv import EdgeConv
 from torch_geometric.nn.pool import avg_pool_x
 from torch.nn import Sequential, Linear
@@ -45,20 +44,24 @@ class TestNet(nn.Module):
 
         self.conv2 = EdgeConv(
             nn=torch.nn.Linear(2 * n_features, 10),
-            aggr='add')
+            aggr='add', )
         # self.conv1 = torch_geometric.nn.GCNConv(4, 16)
         # self.conv2 = torch_geometric.nn.GCNConv(16, 10)
 
         self.output = torch.nn.Linear(10, 1)
     
-    def forward(self, data):
+    def forward(self, data, batch_x):
         x, edge_index = data.x, data.edge_index
         x = self.conv1(x, edge_index)
         x = F.relu(x)
         x = self.conv2(x, edge_index)
         x = F.relu(x)
         x = self.output(x)
-        energy = torch.sum(x, dim=0)
+        
+        # energy, batch = torch_geometric.nn.avg_pool_x(batch_x, x, batch_x)
+        energy = torch_geometric.graphgym.models.pooling.global_add_pool(x, batch_x)
+        # print(x.shape[0])
+        # energy = x.shape[0] * energy
         return energy
 
 
@@ -72,8 +75,10 @@ loss = nn.MSELoss()
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.1)
 
 
-train_loader = DataLoader(TracksterLoader(root, regex=regex, N_events=N_events),
-    batch_size=BATCHSIZE, shuffle=True)
+train_loader = DataLoader(
+    TracksterLoader(root, regex=regex, N_events=N_events),
+    follow_batch=['x'],
+    batch_size=BATCHSIZE, shuffle=False)
 
 
 losses = []
@@ -84,8 +89,9 @@ def train():
     for epoch in range(5):
         epoch_loss = []
         for data in train_loader:
+            # pdb.set_trace()
             data = data.to(device)
-            energy = model(data)
+            energy = model(data, data.x_batch)
             loss_value = loss(energy, data.y)
             loss_value.backward()
             epoch_loss.append(loss_value.item())
