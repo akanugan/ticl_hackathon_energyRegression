@@ -69,6 +69,11 @@ class TestNet(nn.Module):
         # energy = x.shape[0] * energy
         return energy
 
+def mape_loss(output, target):
+    loss = torch.mean((output - target).abs() * 100 / target.abs())
+    return loss
+
+#loss = nn.MSELoss()
 
 CUDA_VISIBLE_DEVICES=2,4
 
@@ -79,16 +84,16 @@ print(device)
 model = TestNet().to(device)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
-loss = nn.MSELoss()
+
+
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.1)
+
 
 
 train_loader = DataLoader(
     TracksterLoader(root, regex=regex, N_events=N_events),
     follow_batch=['x'],
     batch_size=BATCHSIZE, shuffle=False)
-
-
 
 
 ls = []
@@ -101,9 +106,14 @@ def train():
         epoch_loss = []
         for data in train_loader:
             # pdb.set_trace()
+            # if (data.y.shape[0]!=BATCHSIZE):
+            #    pdb.set_trace()
+                
             data = data.to(device)
             energy = model(data, data.x_batch)
-            loss_value = loss(energy, data.y)
+            loss_value = mape_loss(energy, data.y)
+
+            #loss_value = loss(energy, data.y)
             loss_value.backward()
             epoch_loss.append(loss_value.item())
             optimizer.step()

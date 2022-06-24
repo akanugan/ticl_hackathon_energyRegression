@@ -22,6 +22,8 @@ import glob
 import os.path as osp
 
 import time
+from ordered_set import OrderedSet
+
 
 class TracksterLoader(Dataset):
 
@@ -34,6 +36,7 @@ class TracksterLoader(Dataset):
         self.N_events = N_events
         self.calc_offset()
         self.root = root
+        self.file_count = -1
         
         
 
@@ -64,56 +67,58 @@ class TracksterLoader(Dataset):
     def processed_file_names(self):
         return []
 
-    def calculate_edges(self, df):
-        cluster_indices = ['vertices_x', 'vertices_y', 'vertices_z', 'vertices_energy']
+    def calculate_edges(self, list_z):
+
+        edges = []
         starts = []
-        stops = []
-        N_tracksters = df.NTracksters.median().astype(int)
+        stops = [] 
+
         N_clusters = []
-        for t in range(N_tracksters):
-            trackster = df.loc[t].reset_index()
-            df = df[cluster_indices]
-            z_values = df.loc[t]['vertices_z'].unique()
-            for i, z in enumerate(z_values):
-                layer = trackster.where(trackster.vertices_z == z_values[i]).dropna()['subsubentry'].values
-                pre_layer = trackster.where(trackster.vertices_z == z_values[i-1]).dropna()['subsubentry'].values
-                # print(f"layer {i}: layer: {layer}")
-                # print(f"layer {i}: pre_layer: {pre_layer}")
+        for i, trackster in enumerate(list_z):
+            #print(f"trackster {i}")
+            z_values = OrderedSet(trackster)
+            nz = len(z_values)
+            for i,z in enumerate(z_values):
+                layer = [x for x, e in enumerate(trackster) if e == z_values[i]]
+                pre_layer = [x for x, e in enumerate(trackster) if e == z_values[i-1]]
+                    
                 for l in layer:
                     for k in layer:
                         if l < k:
                         # Connect nodes from the same layer (l < k makes sure connections aren't added twice)
                         # Adding the sum of N_clusters assures that our graph is not connecting nodes belonging to different tracksters
-                            starts.append(int(np.sum(N_clusters)) + l.astype(int))
-                            stops.append(int(np.sum(N_clusters)) + k.astype(int))
+                            starts.append(int(np.sum(N_clusters)) + l)
+                            stops.append(int(np.sum(N_clusters)) + k)
                     for k in pre_layer:
                         # Connect nodes from the previous layer
                         # Adding the sum of N_clusters assures that our graph is not connecting nodes belonging to different tracksters
-                        starts.append(int(np.sum(N_clusters)) + l.astype(int))
-                        stops.append(int(np.sum(N_clusters)) + k.astype(int))
+                        starts.append(int(np.sum(N_clusters)) + l)
+                        stops.append(int(np.sum(N_clusters)) + k)
             # It's important to only append this AFTER creating the edges for this trackster otherwise it will screw up the indices of the edges
             N_clusters.append(len(trackster))
         return starts, stops
 
 
-    def turn_df_to_graph(self, df):
+    def turn_df_to_graph(self, x, y):
         """
         df has to be a graph including a single event, it should have two indices, 
         the first one belonging to the trackster and the second one to the cluster
         """
-        cluster_indices = ['vertices_x', 'vertices_y', 'vertices_z', 'vertices_energy']
-        N_tracksters = df.NTracksters.median().astype(int)
-        event_edges = torch.tensor(self.calculate_edges(df))
-        X_ID = []
-        # y = calo energy
-        vertices = torch.tensor(df[cluster_indices].values, dtype=torch.float)
-        stsReg =  torch.tensor(df['sim_tracksters_CP_regE'][0].values[0], dtype=torch.float)
-        for i in range(N_tracksters):
-            # Loop over tracksters to get the number of layer clusters
-            n_layer_clusters = len(df.loc[i])
-            X_ID.append(i * np.ones(n_layer_clusters))
-        X_ID = torch.from_numpy(np.concatenate(X_ID))
-        graph = torch_geometric.data.Data(x=vertices, edge_index=event_edges, x_id=X_ID, y=stsReg)
+
+        ls = []
+
+        # in x we store [list_x, list_y, list_z, list_e] with list_x = [[lc_vertices_x_0, lc_vertices_x_1, ...],[...],...]
+        for i in range(len(x[0])):
+            for j in range(len(x[0][i])):
+                ls.append([x[0][i][j], x[1][i][j], x[2][i][j], x[3][i][j]])
+                
+        vertices = torch.tensor(ls, dtype=torch.float)
+        stsReg = torch.tensor(y, dtype=torch.float)
+
+        # Calculate edges using vertex_z positions
+        event_edges = torch.tensor(self.calculate_edges(x[2]), dtype=torch.long)
+
+        graph = torch_geometric.data.Data(x=vertices, edge_index=event_edges, y=stsReg)
         return graph
 
 
@@ -121,56 +126,69 @@ class TracksterLoader(Dataset):
         file_idx = np.searchsorted(self.strides, idx,side='right')-1
         evt_idx = idx - self.strides[max(0,file_idx)]
 
-        print(file_idx, evt_idx)
+        #print(file_idx, evt_idx)
 
-        counter = 0
-        with uproot.open(self.raw_paths[file_idx]) as f:
-            tracksters = f["ntuplizer/tracksters"]
-            sim_tracksters_CP = f["ntuplizer/simtrackstersCP"]
-            sim_tracksters_CP_regE_df = ak.to_pandas(sim_tracksters_CP.arrays('stsCP_regressed_energy', entry_start = evt_idx, entry_stop = evt_idx + 1))
-            event = ak.to_pandas(tracksters.arrays(entry_start = evt_idx, entry_stop = evt_idx + 1)) # Update me!!!! Takes half a second
-            event['sim_tracksters_CP_regE'] = sim_tracksters_CP_regE_df
-            event = event.loc[0] # Now only two indices are left
-            data = self.turn_df_to_graph(event)
-            return data
+        if (self.file_count != file_idx):
+            with uproot.open(self.raw_paths[file_idx]) as f:
+                trackster = f['ntuplizer/tracksters;4']
+                sim_tracksters_CP = f["ntuplizer/simtrackstersCP"]
 
-            '''
+                sim_tracksters_CP_regE_df = sim_tracksters_CP.arrays('stsCP_regressed_energy', library='np')
+                self.x = trackster.arrays(["event","vertices_x", "vertices_y","vertices_z","vertices_energy"],library='np')
+                self.y = (sim_tracksters_CP_regE_df)
+            self.file_count = file_idx
 
-            x_jet = np.squeeze(f['x0'][idx_in_file])
-            Ntrack = int(x_jet[0])
-            if Ntrack > 0:
-                x_track = f['x1'][idx_in_file,:Ntrack,:]
-            else:
-                Ntrack = 1
-                x_track = np.zeros((1,8), dtype=np.float32)
-            
-            Nsv = int(x_jet[1])
-            if Nsv > 0:
-                x_sv = f['x2'][idx_in_file,:Nsv,:]
-            else:
-                Nsv = 1
-                x_sv = np.zeros((1,2), dtype=np.float32)
+        
+        #idx = self.x['event'][evt_idx]
+        list_x = self.x['vertices_x'][evt_idx].tolist()
+        list_y = self.x['vertices_y'][evt_idx].tolist()
+        list_z = self.x['vertices_z'][evt_idx].tolist()
+        list_e = self.x['vertices_energy'][evt_idx].tolist()
+        y = self.y['stsCP_regressed_energy'][evt_idx]
 
-            # convert to torch
-            x_jet = torch.from_numpy(x_jet[2:])[None]
-            x_track = torch.from_numpy(x_track)
-            x_sv = torch.from_numpy(x_sv)
-            
-            
-            # convert to non-onehot categories
-            y = torch.from_numpy(f['y0'][idx_in_file])
-            y = torch.argmax(y)
-            
-            # "z0" is the basic jet observables pt, eta, phi
-            # store this as the usual x
-            x = torch.from_numpy(f['z0'][idx_in_file])
-            x_jet_raw = torch.from_numpy(f['z1'][idx_in_file])
+        x = [list_x, list_y, list_z, list_e]
+        if list_x ==[]:
+            y = []
+        data = self.turn_df_to_graph(x, y)
+        return data
 
-            return Data(x=x, edge_index=edge_index, y=y,
-                        x_jet=x_jet, x_track=x_track, x_sv=x_sv,
-                        x_jet_raw=x_jet_raw)
+        '''
 
-            '''
+        x_jet = np.squeeze(f['x0'][idx_in_file])
+        Ntrack = int(x_jet[0])
+        if Ntrack > 0:
+            x_track = f['x1'][idx_in_file,:Ntrack,:]
+        else:
+            Ntrack = 1
+            x_track = np.zeros((1,8), dtype=np.float32)
+        
+        Nsv = int(x_jet[1])
+        if Nsv > 0:
+            x_sv = f['x2'][idx_in_file,:Nsv,:]
+        else:
+            Nsv = 1
+            x_sv = np.zeros((1,2), dtype=np.float32)
+
+        # convert to torch
+        x_jet = torch.from_numpy(x_jet[2:])[None]
+        x_track = torch.from_numpy(x_track)
+        x_sv = torch.from_numpy(x_sv)
+        
+        
+        # convert to non-onehot categories
+        y = torch.from_numpy(f['y0'][idx_in_file])
+        y = torch.argmax(y)
+        
+        # "z0" is the basic jet observables pt, eta, phi
+        # store this as the usual x
+        x = torch.from_numpy(f['z0'][idx_in_file])
+        x_jet_raw = torch.from_numpy(f['z1'][idx_in_file])
+
+        return Data(x=x, edge_index=edge_index, y=y,
+                    x_jet=x_jet, x_track=x_track, x_sv=x_sv,
+                    x_jet_raw=x_jet_raw)
+
+        '''
 
 
 if __name__ == '__main__':
@@ -179,7 +197,8 @@ if __name__ == '__main__':
 
     if os.uname()[1] == 'patatrack02.cern.ch':
         root = "/eos/cms/store/group/dpg_hgcal/comm_hgcal/hackathon/samples/close_by_single_kaon/production/7264977/"
-        regex = "ntuples_7*"
+        #regex = "ntuples_7*"
+        regex = "ntuples_7087242_2*"
         N_events = 10000
     elif os.uname()[1] == 'x360':
         print("Running on x360")
@@ -194,12 +213,10 @@ if __name__ == '__main__':
 
     train_loader = DataLoader(dataset)
     for i, data in enumerate(train_loader):
-        #if i > 11: break
-        '''
+        if i > 11: break
         print(f"Event {i}")
         print(f"Data: {data}")
         print()
-        print(f"Data[0].x: {data[0].x}")
-        print(f"Data[0].edge_index: {data[0].edge_index}")
-        print(f"Truth: ", data[0].y)
-        '''
+        #print(f"Data[0].x: {data[0].x}")
+        #print(f"Data[0].edge_index: {data[0].edge_index}")
+        #print(f"Truth: ", data[0].y)
