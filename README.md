@@ -42,3 +42,16 @@ To deactivate the virtual environment, simply:
 ```
 conda deactivate
 ```
+Most likely the conda won't be having the PyTorch. Install it using:
+```bash
+conda update -n base -c defaults conda
+conda install pytorch torchvision torchaudio cudatoolkit=10.2 -c pytorch
+```
+Verify:
+```bash
+python -c "import torch; print(torch.__version__)"
+```
+Then proceed to install PyGeometric:
+```bash
+conda install pyg -c pyg
+```
