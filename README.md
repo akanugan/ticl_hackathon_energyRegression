@@ -21,6 +21,8 @@ conda activate
 Clone this repo:
 ```bash
 git clone https://github.com/akanugan/ticl_hackathon_energyRegression.git
+cd ticl_hackathon_energyRegression/
+git checkout master
 ```
 
 The script in /bin will create conda env with all packages need in the present folder:
@@ -32,6 +34,7 @@ Then activate the local conda env. by:
 conda activate ./env
 ```
 
+Now run the scripts for the data loader and testing the model:
 ```bash 
 python DataLoader.py
 python models.py
