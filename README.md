@@ -31,7 +31,7 @@ unset __conda_setup
 ```
 Clone this repo:
 ```bash
-https://github.com/akanugan/ticl_hackathon_energyRegression.git
+git clone https://github.com/akanugan/ticl_hackathon_energyRegression.git
 ```
 
 The script in /bin will create conda env with all packages need in the present folder:
@@ -42,6 +42,11 @@ Then activate the local conda env. by:
 ```bash
 conda activate ./env
 ```
+
+```bash 
+python DataLoader.py
+```
+
 To deactivate:
 ```bash
 conda deactivate
