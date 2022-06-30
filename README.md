@@ -29,6 +29,11 @@ else
 fi
 unset __conda_setup
 ```
+Clone this repo:
+```bash
+https://github.com/akanugan/ticl_hackathon_energyRegression.git
+```
+
 The script in /bin will create conda env with all packages need in the present folder:
 ```bash
 bash bin/create-conda-env.sh
