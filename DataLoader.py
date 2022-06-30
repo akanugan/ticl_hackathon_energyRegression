@@ -206,7 +206,8 @@ if __name__ == '__main__':
         regex = 'testdata*'
         N_events = 3
     else:
-        root = "/Users/ankush/Documents/TICL-hack/ticl_hackathon_energy_regression/"
+        #root = "/Users/ankush/Documents/TICL-hack/ticl_hackathon_energy_regression/"
+        root = "/cms/data/akanugan/ana_cms/TICL_hackathon/ticl_hackathon_energyRegression/"
         regex = 'testdata*'
         N_events = 3000
         print("Please specify root path")

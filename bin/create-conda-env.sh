@@ -18,3 +18,4 @@ python -m pip install torch-geometric --no-cache-dir
 python -m pip install uproot
 python -m pip install awkward
 python -m pip install ordered_set
+python -m pip install yacs

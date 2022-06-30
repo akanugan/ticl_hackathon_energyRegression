@@ -2,7 +2,7 @@ import pdb
 import os
 import argparse
 
-os.environ["CUDA_VISIBLE_DEVICES"]="3"
+#os.environ["CUDA_VISIBLE_DEVICES"]="3"
 
 import sklearn
 import numpy as np
@@ -37,7 +37,7 @@ elif os.uname()[1] == 'x360':
     regex = 'testdata*'
     N_events = 40
 else:
-    root = "/Users/ankush/Documents/TICL-hack/ticl_hackathon_energy_regression/"
+    root = "/cms/data/akanugan/ana_cms/TICL_hackathon/ticl_hackathon_energyRegression/"
     regex = 'testdata*'
     N_events = 3000
     print("Please specify root path")
@@ -79,7 +79,7 @@ def mape_loss(output, target):
 
 #loss = nn.MSELoss()
 
-CUDA_VISIBLE_DEVICES=2,4
+#CUDA_VISIBLE_DEVICES=2,4
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
