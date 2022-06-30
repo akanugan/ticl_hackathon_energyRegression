@@ -29,3 +29,16 @@ else
 fi
 unset __conda_setup
 ```
+Create a new conda env with python pre-installed python3:
+
+```
+conda create --name ticl_energyReg python=3.7
+conda activate ticl_energyReg
+```
+
+Note: it is necessary to execute 'conda activate ticl_energyReg' at the start of logging in
+To deactivate the virtual environment, simply:
+
+```
+conda deactivate
+```
