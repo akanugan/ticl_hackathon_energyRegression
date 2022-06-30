@@ -206,6 +206,9 @@ if __name__ == '__main__':
         regex = 'testdata*'
         N_events = 3
     else:
+        root = "/Users/ankush/Documents/TICL-hack/ticl_hackathon_energy_regression/"
+        regex = 'testdata*'
+        N_events = 3000
         print("Please specify root path")
 
     dataset = TracksterLoader(root, regex=regex, N_events=N_events)

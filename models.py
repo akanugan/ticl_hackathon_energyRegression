@@ -18,12 +18,13 @@ from torch.nn import Sequential, Linear
 from torch_geometric.nn import DataParallel
 from torch_geometric.data import DataLoader
 import torch_geometric
+from torch.optim import Adam, LBFGS, SGD
 
 from DataLoader import TracksterLoader
 import csv
 
-BATCHSIZE = 512
-EPOCH = 2
+BATCHSIZE = 32
+EPOCH = 20
 
 if os.uname()[1] == 'patatrack02.cern.ch':
     root = "/data2/user/phzehetn/Hackathon/Data/"
@@ -36,6 +37,9 @@ elif os.uname()[1] == 'x360':
     regex = 'testdata*'
     N_events = 40
 else:
+    root = "/Users/ankush/Documents/TICL-hack/ticl_hackathon_energy_regression/"
+    regex = 'testdata*'
+    N_events = 3000
     print("Please specify root path")
 
 
@@ -83,10 +87,10 @@ print(device)
 
 model = TestNet().to(device)
 
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+#optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+optimizer = LBFGS(model.parameters(), history_size=10, max_iter=4, lr = 0.01, line_search_fn="strong_wolfe")
 
-
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.1)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.1)
 
 
 
@@ -104,40 +108,62 @@ def train():
     optimizer.zero_grad()
     for epoch in range(EPOCH):
         epoch_loss = []
+        running_loss = 0.0
         for data in train_loader:
             # pdb.set_trace()
             # if (data.y.shape[0]!=BATCHSIZE):
             #    pdb.set_trace()
-                
             data = data.to(device)
-            energy = model(data, data.x_batch)
-            loss_value = mape_loss(energy, data.y)
 
+            def closure():
+                # Zero gradients
+                optimizer.zero_grad()
+
+                # Forward pass
+                energy = model(data, data.x_batch)
+                #y_pred = lm_lbfgs(x_)
+
+                # Compute loss
+                #loss_value = mape_loss(energy, data.y)
+                loss = mape_loss(energy, data.y)
+                
+                # Backward pass
+                loss.backward() 
+                return loss
+
+            #energy = model(data, data.x_batch)
+            #loss_value = mape_loss(energy, data.y)
             #loss_value = loss(energy, data.y)
-            loss_value.backward()
-            epoch_loss.append(loss_value.item())
-            optimizer.step()
+            #loss_value.backward()
+            #epoch_loss.append(loss_value.item())
+            #epoch_loss.append(loss.item())
+            #optimizer.step()
+            optimizer.step(closure)
+            loss = closure()
+            running_loss += loss.item()
+        print(f"Epoch: {epoch + 1:02}/{EPOCH} Loss: {running_loss}")
         #print(f"Loss after {epoch+1} epochs", np.mean(epoch_loss))
-        sdir = save_dir + f'{epoch}/'
-        try:
-            os.mkdir(sdir)
-        except:
-            print(f"{sdir} already exists")
-        torch.save(model.state_dict(), sdir + 'model.pb')
-        print("Epoch", epoch, "Loss", np.mean(epoch_loss), "Pred", energy.detach(), "GT", data.y)
-        ls.append([epoch, np.mean(epoch_loss), energy.detach().cpu().numpy()[0], data.y.detach().cpu().numpy()[0]])
+        # sdir = save_dir + f'{epoch}/'
+        # try:
+        #     os.mkdir(sdir)
+        # except:
+        #     print(f"{sdir} already exists")
+        # torch.save(model.state_dict(), sdir + 'model.pb')
+        #print("Epoch", epoch, "Loss", np.mean(epoch_loss), "Pred", energy.detach(), "GT", data.y)
+        #print("Epoch", epoch, "Pred", energy.detach(), "GT", data.y)
+        #ls.append([epoch, np.mean(epoch_loss), energy.detach().cpu().numpy()[0], data.y.detach().cpu().numpy()[0]])
 
 
 train()
 print("DONE")
 
-filename = 'b1_ev100_ep100.csv'
-header = ["Epoch", "Mean Loss", "Pred", "Truth"]
-with open(filename, 'w', newline="") as file:
-    csvwriter = csv.writer(file)
-    csvwriter.writerow(header)
-    for row in ls:
-        csvwriter.writerow(row)
+# filename = 'b1_ev100_ep100.csv'
+# header = ["Epoch", "Mean Loss", "Pred", "Truth"]
+# with open(filename, 'w', newline="") as file:
+#     csvwriter = csv.writer(file)
+#     csvwriter.writerow(header)
+#     for row in ls:
+#         csvwriter.writerow(row)
 
 
-torch.save(model.state_dict(), save_dir+'model.pb')
+# torch.save(model.state_dict(), save_dir+'model.pb')
