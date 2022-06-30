@@ -1,7 +1,7 @@
 # Energy Regression (and PID)
 ----
 
-Repository for our work on energy regression during the ticl hackathon 2022
+Repository for our work on energy regression during the ticl hackathon 2022\
 Use this on patatrack 
 
 To run the Singularity:
