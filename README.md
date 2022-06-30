@@ -12,7 +12,7 @@ singularity shell --nv /eos/cms/store/user/bmaier/sandboxes/geometricdl.sif
 ```
 -------------------------------
 
-# For use on Kodiak:\
+# For use on Kodiak:
 Assuming that anaconda is already setup, you can check this by:
 ```bash
 conda activate
