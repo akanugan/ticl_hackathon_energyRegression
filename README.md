@@ -29,29 +29,11 @@ else
 fi
 unset __conda_setup
 ```
-Create a new conda env with python pre-installed python3:
-
-```
-conda create --name ticl_energyReg python=3.7
-conda activate ticl_energyReg
-```
-
-Note: it is necessary to execute 'conda activate ticl_energyReg' at the start of logging in\
-To deactivate the virtual environment, simply:
-
-```
-conda deactivate
-```
-Most likely the conda won't be having the PyTorch. Install it using:
+The script in /bin will create conda env with all packages need in the present folder:
 ```bash
-conda update -n base -c defaults conda
-conda install pytorch torchvision torchaudio cudatoolkit=10.2 -c pytorch
+bash bin/create-conda-env.sh
 ```
-Verify:
+Then activate the local conda env. by:
 ```bash
-python -c "import torch; print(torch.__version__)"
-```
-Then proceed to install PyGeometric:
-```bash
-conda install pyg -c pyg
+conda activate ./env
 ```
