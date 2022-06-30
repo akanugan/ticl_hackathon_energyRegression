@@ -37,3 +37,7 @@ Then activate the local conda env. by:
 ```bash
 conda activate ./env
 ```
+To deactivate:
+```bash
+conda deactivate
+```
