@@ -29,6 +29,11 @@ This script will create conda env. with all packages needed in the present folde
 ```bash
 bash bin/create-conda-env.sh
 ```
+Temp:
+```bash
+bash install_pkgs.sh
+```
+
 Then activate the local conda env. by:
 ```bash
 conda activate ./env
